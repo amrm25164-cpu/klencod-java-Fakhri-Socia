@@ -1,73 +1,43 @@
-name: Build Android Java APK
+
+name: Build Fakhri Social APK
 
 on:
   workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: klencod-java-${{ github.repository }}
-  cancel-in-progress: true
+  push:
+    branches: [ main ]
 
 jobs:
   build:
-    name: Build debug APK
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout project
+      - name: Download project
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      - name: Set up Java 17
+      - name: Install Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: 'platforms;android-34 build-tools;34.0.0'
-          accept-android-sdk-licenses: true
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Build debug APK
-        shell: bash
-        run: |
-          set -o pipefail
-          LOG="$RUNNER_TEMP/klencod-gradle.log"
+        run: gradle --no-daemon assembleDebug
 
-          if [ -f gradlew ]; then
-            echo "✅ Using Gradle Wrapper (gradlew)"
-            chmod +x gradlew || true
-            ./gradlew --no-daemon --build-cache --parallel \
-              :app:assembleDebug -x lint -x test 2>&1 | tee "$LOG"
-          else
-            echo "⚠️ gradlew غير موجود — استخدام gradle من النظام"
-            echo "ℹ️ هذا شائع في المشاريع المستوردة من الخارج"
-            gradle --no-daemon --build-cache --parallel \
-              :app:assembleDebug -x lint -x test 2>&1 | tee "$LOG"
-          fi
-
-      - name: Print compiler diagnostics on failure
-        if: failure()
-        shell: bash
-        run: |
-          LOG="$RUNNER_TEMP/klencod-gradle.log"
-          echo "===== Klencod compiler diagnostics ====="
-          if [[ -f "$LOG" ]]; then
-            grep -E 'error:|warning:|FAILED|Compilation failed|BUILD FAILED|What went wrong' "$LOG" | tail -n 120 || true
-          else
-            echo "Gradle output file was not created."
-          fi
-
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: klencod-java-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 7
+          name: Fakhri-Social-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          

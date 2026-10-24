@@ -1,406 +1,459 @@
+
 package com.fakhri.social;
 
 import android.app.*;
-import android.os.Bundle;
+import android.os.*;
+import android.content.*;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
-import android.content.*;
 import android.view.*;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
-import org.json.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.util.ArrayList;
 
 public class MainActivity extends Activity {
 
-    private final int BG = Color.rgb(12, 16, 29);
-    private final int CARD = Color.rgb(24, 30, 48);
-    private final int TEXT = Color.rgb(241, 244, 252);
-    private final int MUTED = Color.rgb(157, 169, 192);
-    private final int ACCENT = Color.rgb(90, 104, 255);
-
-    private LinearLayout base, content, nav;
-    private EditText composer;
-    private SharedPreferences prefs;
-    private JSONArray posts;
-    private String username = "Amr";
-    private String page = "home";
-    private int nextId = 1;
+    private LinearLayout root, postsLayout;
+    private EditText postInput, searchInput;
+    private TextView status;
+    private JSONArray posts = new JSONArray();
+    private android.content.SharedPreferences prefs;
+    private String profileName = "مستخدم فخري";
+    private String currentTab = "الرئيسية";
+    private int background = Color.rgb(18, 22, 32);
+    private int panel = Color.rgb(30, 36, 50);
+    private int accent = Color.rgb(95, 120, 255);
+    private int white = Color.WHITE;
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        getWindow().setStatusBarColor(BG);
-        getWindow().setNavigationBarColor(BG);
+    public void onCreate(Bundle state) {
+        super.onCreate(state);
 
         prefs = getSharedPreferences("fakhri_social", MODE_PRIVATE);
-        username = prefs.getString("username", "Amr");
+        profileName = prefs.getString("profile_name", "مستخدم فخري");
 
         try {
             posts = new JSONArray(prefs.getString("posts", "[]"));
-
-            for (int i = 0; i < posts.length(); i++) {
-                nextId = Math.max(
-                    nextId,
-                    posts.getJSONObject(i).optInt("id", 0) + 1
-                );
-            }
         } catch (Exception e) {
             posts = new JSONArray();
         }
 
-        render();
+        buildUI();
+        showHome();
     }
 
-    private GradientDrawable background(int color, int radius) {
+    private TextView text(String value, int size) {
+        TextView t = new TextView(this);
+        t.setText(value);
+        t.setTextSize(size);
+        t.setTextColor(white);
+        t.setPadding(12, 10, 12, 10);
+        return t;
+    }
+
+    private GradientDrawable shape(int color, int radius) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(color);
         d.setCornerRadius(radius);
         return d;
     }
 
-    private TextView makeText(
-        String value, int size, int color, boolean bold
-    ) {
-        TextView t = new TextView(this);
-        t.setText(value);
-        t.setTextSize(size);
-        t.setTextColor(color);
-        t.setGravity(Gravity.RIGHT);
-        t.setTextDirection(View.TEXT_DIRECTION_RTL);
-
-        if (bold) {
-            t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        }
-
-        return t;
-    }
-
-    private TextView makeButton(String value, Runnable action) {
-        TextView b = makeText(value, 14, Color.WHITE, true);
-        b.setGravity(Gravity.CENTER);
-        b.setPadding(16, 12, 16, 12);
-        b.setBackground(background(ACCENT, 24));
+    private Button button(String label, Runnable action) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextColor(white);
+        b.setAllCaps(false);
+        b.setBackground(shape(accent, 18));
         b.setOnClickListener(v -> action.run());
         return b;
     }
 
-    private void savePosts() {
-        prefs.edit()
-            .putString("posts", posts.toString())
-            .putString("username", username)
-            .apply();
-    }
+    private void buildUI() {
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(background);
 
-    private void render() {
-        base = new LinearLayout(this);
-        base.setOrientation(LinearLayout.VERTICAL);
-        base.setBackgroundColor(BG);
-        setContentView(base);
+        TextView title = text("FAKHRI SOCIAL", 24);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(accent);
+        root.addView(title);
 
-        LinearLayout header = new LinearLayout(this);
-        header.setPadding(18, 16, 18, 16);
-        header.setGravity(Gravity.CENTER_VERTICAL);
+        status = text("تواصل، شارك، واكتشف", 14);
+        root.addView(status);
 
-        TextView logo = makeText(
-            "Fakhri Social", 22, TEXT, true
-        );
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
 
-        header.addView(
-            logo,
-            new LinearLayout.LayoutParams(0, -2, 1)
-        );
+        String[] tabs = {"الرئيسية", "بحث", "حسابي", "الإعدادات"};
+        for (String tab : tabs) {
+            Button b = new Button(this);
+            b.setText(tab);
+            b.setTextSize(11);
+            b.setAllCaps(false);
+            b.setTextColor(white);
+            b.setBackgroundColor(panel);
+            b.setOnClickListener(v -> openTab(tab));
 
-        base.addView(header);
-
-        ScrollView scroll = new ScrollView(this);
-        content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(16, 8, 16, 16);
-
-        scroll.addView(content);
-
-        base.addView(
-            scroll,
-            new LinearLayout.LayoutParams( -1, 0, 1)
-        );
-
-        if (page.equals("home")) {
-            showHome();
-        } else if (page.equals("profile")) {
-            showProfile();
-        } else if (page.equals("settings")) {
-            showSettings();
+            nav.addView(b, new LinearLayout.LayoutParams(
+                    0, dp(48), 1));
         }
 
-        nav = new LinearLayout(this);
-        nav.setGravity(Gravity.CENTER);
-        nav.setPadding(4, 10, 4, 10);
-        nav.setBackgroundColor(CARD);
+        root.addView(nav);
 
-        addNavButton("الرئيسية", "home");
-        addNavButton("حسابي", "profile");
-        addNavButton("الإعدادات", "settings");
+        FrameLayout content = new FrameLayout(this);
+        content.setId(View.generateViewId());
 
-        base.addView(nav);
+        ScrollView scroll = new ScrollView(this);
+        postsLayout = new LinearLayout(this);
+        postsLayout.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(postsLayout);
+
+        content.addView(scroll);
+        root.addView(content, new LinearLayout.LayoutParams(
+                -1, 0, 1));
+
+        setContentView(root);
     }
 
-    private void addNavButton(String label, String target) {
-        TextView b = makeText(label, 13, TEXT, true);
-        b.setGravity(Gravity.CENTER);
-        b.setPadding(8, 10, 8, 10);
+    private int dp(int value) {
+        return (int) (value * getResources()
+                .getDisplayMetrics().density + 0.5f);
+    }
 
-        b.setOnClickListener(v -> {
-            page = target;
-            render();
-        });
+    private void openTab(String tab) {
+        currentTab = tab;
 
-        nav.addView(
-            b,
-            new LinearLayout.LayoutParams(0, -2, 1)
-        );
+        if (tab.equals("الرئيسية")) {
+            showHome();
+        } else if (tab.equals("بحث")) {
+            showSearch();
+        } else if (tab.equals("حسابي")) {
+            showProfile();
+        } else {
+            showSettings();
+        }
+    }
+
+    private void clearContent(String subtitle) {
+        postsLayout.removeAllViews();
+        status.setText(subtitle);
     }
 
     private void showHome() {
-        content.addView(
-            makeText("أهلاً بيك يا " + username + " 👋", 22, TEXT, true)
-        );
+        clearContent("آخر المنشورات");
 
-        content.addView(
-            makeText("شارك أفكارك مع مجتمعك.", 14, MUTED, false)
-        );
+        postInput = new EditText(this);
+        postInput.setHint("بماذا تفكر؟");
+        postInput.setTextColor(white);
+        postInput.setHintTextColor(Color.LTGRAY);
+        postInput.setMinLines(2);
+        postInput.setGravity(Gravity.TOP);
+        postInput.setPadding(dp(14), dp(12), dp(14), dp(12));
+        postInput.setBackground(shape(panel, 18));
 
-        composer = new EditText(this);
-        composer.setHint("اكتب منشورك هنا...");
-        composer.setTextColor(TEXT);
-        composer.setHintTextColor(MUTED);
-        composer.setGravity(Gravity.RIGHT | Gravity.TOP);
-        composer.setTextDirection(View.TEXT_DIRECTION_RTL);
-        composer.setMinLines(2);
-        composer.setPadding(12, 12, 12, 12);
-        composer.setBackground(background(CARD, 16));
+        postsLayout.addView(postInput, matchParams());
 
-        LinearLayout.LayoutParams cp =
-            new LinearLayout.LayoutParams(-1, -2);
-        cp.setMargins(0, 16, 0, 8);
+        Button publish = button("نشر منشور", this::publishPost);
+        postsLayout.addView(publish, matchParams());
 
-        content.addView(composer, cp);
+        addSpace();
 
-        content.addView(
-            makeButton("نشر +", () -> publishPost())
-        );
+        for (int i = posts.length() - 1; i >= 0; i--) {
+            try {
+                JSONObject post = posts.getJSONObject(i);
+                addPostCard(post);
+            } catch (Exception ignored) {}
+        }
 
-        TextView title = makeText(
-            "آخر المنشورات", 19, TEXT, true
-        );
-        title.setPadding(0, 22, 0, 12);
-        content.addView(title);
-
-        for (int i = 0; i < posts.length(); i++) {
-            JSONObject p = posts.optJSONObject(i);
-            if (p != null) {
-                showPost(p);
-            }
+        if (posts.length() == 0) {
+            postsLayout.addView(text(
+                    "لا توجد منشورات حتى الآن. اكتب أول منشور!",
+                    16));
         }
     }
 
     private void publishPost() {
-        String body = composer.getText().toString().trim();
+        String body = postInput.getText().toString().trim();
 
         if (body.isEmpty()) {
-            composer.setError("اكتب المنشور أولًا");
+            Toast.makeText(this, "اكتب شيئًا قبل النشر",
+                    Toast.LENGTH_SHORT).show();
             return;
         }
 
         try {
-            JSONObject p = new JSONObject();
-            p.put("id", nextId++);
-            p.put("author", username);
-            p.put("body", body);
-            p.put("likes", 0);
-            p.put("liked", false);
-            p.put("comments", new JSONArray());
+            JSONObject post = new JSONObject();
+            post.put("id", System.currentTimeMillis());
+            post.put("author", profileName);
+            post.put("body", body);
+            post.put("likes", 0);
+            post.put("liked", false);
+            post.put("comments", new JSONArray());
 
-            JSONArray updated = new JSONArray();
-            updated.put(p);
-
-            for (int i = 0; i < posts.length(); i++) {
-                updated.put(posts.getJSONObject(i));
-            }
-
-            posts = updated;
+            posts.put(post);
             savePosts();
-            render();
 
-            Toast.makeText(
-                this, "تم نشر المنشور", Toast.LENGTH_SHORT
-            ).show();
+            ((InputMethodManager) getSystemService(
+                    INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(
+                    postInput.getWindowToken(), 0);
+
+            showHome();
 
         } catch (Exception e) {
-            Toast.makeText(
-                this, "تعذر نشر المنشور", Toast.LENGTH_SHORT
-            ).show();
+            Toast.makeText(this, "تعذّر نشر المنشور",
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void showPost(JSONObject p) {
+    private void addPostCard(JSONObject post) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(14, 14, 14, 14);
-        card.setBackground(background(CARD, 18));
+        card.setPadding(dp(10), dp(8), dp(10), dp(8));
+        card.setBackground(shape(panel, 18));
 
-        LinearLayout.LayoutParams params =
-            new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, 0, 0, 12);
+        LinearLayout.LayoutParams cardParams = matchParams();
+        cardParams.setMargins(0, dp(5), 0, dp(8));
 
-        card.setLayoutParams(params);
+        TextView author = text(
+                "👤 " + post.optString("author", "مستخدم"), 15);
+        author.setTypeface(null, Typeface.BOLD);
+        card.addView(author);
 
-        card.addView(makeText(
-            p.optString("author", "مستخدم"), 15, TEXT, true
-        ));
-
-        TextView body = makeText(
-            p.optString("body", ""), 15, TEXT, false
-        );
-        body.setPadding(0, 12, 0, 12);
+        TextView body = text(post.optString("body"), 16);
         card.addView(body);
 
         LinearLayout actions = new LinearLayout(this);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
 
-        TextView like = makeButton(
-            (p.optBoolean("liked") ? "♥ " : "♡ ")
-                + p.optInt("likes") + " إعجاب",
-            () -> toggleLike(p)
-        );
+        Button like = new Button(this);
+        boolean liked = post.optBoolean("liked", false);
+        like.setText((liked ? "❤️" : "🤍") + " "
+                + post.optInt("likes", 0));
+        like.setAllCaps(false);
+        like.setTextColor(white);
+        like.setBackgroundColor(panel);
 
-        actions.addView(
-            like,
-            new LinearLayout.LayoutParams(0, -2, 1)
-        );
-
-        TextView comments = makeButton(
-            "💬 التعليقات",
-            () -> showComments(p)
-        );
-
-        LinearLayout.LayoutParams commentParams =
-            new LinearLayout.LayoutParams(0, -2, 1);
-        commentParams.setMargins(8, 0, 0, 0);
-        actions.addView(comments, commentParams);
-
-        card.addView(actions);
-        content.addView(card);
-    }
-
-    private void toggleLike(JSONObject p) {
-        try {
-            boolean liked = p.optBoolean("liked");
-            p.put("liked", !liked);
-            p.put(
-                "likes",
-                Math.max(0, p.optInt("likes") + (liked ? -1 : 1))
-            );
-
+        like.setOnClickListener(v -> {
+            boolean wasLiked = post.optBoolean("liked", false);
+            postLikes(post, wasLiked);
             savePosts();
-            render();
-        } catch (Exception ignored) {
+            showHome();
+        });
+
+        Button comment = new Button(this);
+        comment.setText("💬 تعليق");
+        comment.setAllCaps(false);
+        comment.setTextColor(white);
+        comment.setBackgroundColor(panel);
+        comment.setOnClickListener(v -> showComments(post));
+
+        Button share = new Button(this);
+        share.setText("مشاركة");
+        share.setAllCaps(false);
+        share.setTextColor(white);
+        share.setBackgroundColor(panel);
+        share.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("text/plain");
+            intent.putExtra(Intent.EXTRA_TEXT,
+                    post.optString("author") + "\n"
+                    + post.optString("body"));
+            startActivity(Intent.createChooser(intent, "مشاركة المنشور"));
+        });
+
+        actions.addView(like, new LinearLayout.LayoutParams(0, dp(48), 1));
+        actions.addView(comment, new LinearLayout.LayoutParams(0, dp(48), 1));
+        actions.addView(share, new LinearLayout.LayoutParams(0, dp(48), 1));
+        card.addView(actions);
+
+        if (profileName.equals(post.optString("author"))) {
+            Button delete = button("حذف المنشور", () -> {
+                removePost(post.optLong("id"));
+                savePosts();
+                showHome();
+            });
+            card.addView(delete);
         }
+
+        postsLayout.addView(card, cardParams);
     }
 
-    private void showComments(JSONObject p) {
-        JSONArray comments = p.optJSONArray("comments");
-        if (comments == null) {
-            comments = new JSONArray();
+    private void postLikes(JSONObject post, boolean wasLiked) {
+        int count = post.optInt("likes", 0);
+        postRemoveLike(post, wasLiked, count);
+    }
+
+    private void postRemoveLike(JSONObject post, boolean wasLiked, int count) {
+        try {
+            post.put("liked", !wasLiked);
+            post.put("likes", Math.max(0, count + (wasLiked ? -1 : 1)));
+        } catch (Exception ignored) {}
+    }
+
+    private void showComments(JSONObject post) {
+        EditText input = new EditText(this);
+        input.setHint("اكتب تعليقك");
+
+        JSONArray comments = post.optJSONArray("comments");
+        if (comments == null) comments = new JSONArray();
+
+        StringBuilder history = new StringBuilder();
+        for (int i = 0; i < comments.length(); i++) {
+            history.append("• ").append(comments.optString(i)).append("\n");
         }
 
-        final JSONArray list = comments;
-
-        EditText input = new EditText(this);
-        input.setHint("اكتب تعليقك...");
-        input.setGravity(Gravity.RIGHT);
-        input.setTextDirection(View.TEXT_DIRECTION_RTL);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.addView(new TextView(this) {{
+            setText(history.length() == 0 ? "لا توجد تعليقات" : history.toString());
+            setTextSize(16);
+            setPadding(16, 16, 16, 16);
+        }});
+        box.addView(input);
 
         new AlertDialog.Builder(this)
-            .setTitle("التعليقات")
-            .setView(input)
-            .setNegativeButton("إلغاء", null)
-            .setPositiveButton("إضافة", (dialog, which) -> {
-                String value = input.getText().toString().trim();
-
-                if (!value.isEmpty()) {
-                    list.put(username + ": " + value);
-
-                    try {
-                        p.put("comments", list);
-                    } catch (Exception ignored) {
+                .setTitle("التعليقات")
+                .setView(box)
+                .setNegativeButton("إغلاق", null)
+                .setPositiveButton("إضافة", (d, w) -> {
+                    String value = input.getText().toString().trim();
+                    if (!value.isEmpty()) {
+                        JSONArray list = post.optJSONArray("comments");
+                        if (list == null) list = new JSONArray();
+                        list.put(profileName + ": " + value);
+                        try {
+                            post.put("comments", list);
+                        } catch (Exception ignored) {}
+                        savePosts();
+                        showHome();
                     }
+                })
+                .show();
+    }
 
-                    savePosts();
-                    render();
+    private void showSearch() {
+        clearContent("ابحث في المنشورات");
+
+        searchInput = new EditText(this);
+        searchInput.setHint("اكتب كلمة للبحث");
+        searchInput.setTextColor(white);
+        searchInput.setHintTextColor(Color.LTGRAY);
+        searchInput.setSingleLine(true);
+        searchInput.setBackground(shape(panel, 16));
+
+        postsLayout.addView(searchInput, matchParams());
+
+        postsLayout.addView(button("بحث", () -> {
+            String query = searchInput.getText().toString().trim()
+                    .toLowerCase();
+
+            postsLayout.removeAllViews();
+            postsLayout.addView(searchInput, matchParams());
+
+            for (int i = posts.length() - 1; i >= 0; i--) {
+                JSONObject post = posts.optJSONObject(i);
+                if (post == null) continue;
+
+                String body = post.optString("body", "");
+                String author = post.optString("author", "");
+
+                if (body.toLowerCase().contains(query)
+                        || author.toLowerCase().contains(query)) {
+                    addPostCard(post);
                 }
-            })
-            .show();
+            }
+        }), matchParams());
     }
 
     private void showProfile() {
-        content.addView(
-            makeText("الملف الشخصي", 23, TEXT, true)
-        );
+        clearContent("حسابك الشخصي");
 
-        content.addView(
-            makeText("اسم المستخدم: " + username, 17, TEXT, false)
-        );
+        postsLayout.addView(text("👤 " + profileName, 24));
 
-        content.addView(
-            makeButton("تعديل الاسم", () -> {
-                EditText input = new EditText(this);
-                input.setText(username);
+        EditText name = new EditText(this);
+        name.setHint("اسمك");
+        name.setText(profileName);
+        name.setTextColor(white);
+        name.setBackground(shape(panel, 16));
+        postsLayout.addView(name, matchParams());
 
-                new AlertDialog.Builder(this)
-                    .setTitle("تعديل الاسم")
-                    .setView(input)
-                    .setNegativeButton("إلغاء", null)
-                    .setPositiveButton("حفظ", (d, w) -> {
-                        String value = input.getText().toString().trim();
+        postsLayout.addView(button("حفظ الاسم", () -> {
+            String newName = name.getText().toString().trim();
 
-                        if (!value.isEmpty()) {
-                            username = value;
-                            savePosts();
-                            render();
-                        }
-                    })
-                    .show();
-            })
-        );
+            if (newName.isEmpty()) {
+                Toast.makeText(this, "اكتب اسمًا صحيحًا",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            String oldName = profileName;
+            profileName = newName;
+            prefs.edit().putString("profile_name", profileName).apply();
+
+            for (int i = 0; i < posts.length(); i++) {
+                JSONObject p = posts.optJSONObject(i);
+                if (p != null && p.optString("author").equals(oldName)) {
+                    try {
+                        p.put("author", newName);
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            savePosts();
+            showProfile();
+        }), matchParams());
+
+        postsLayout.addView(text("عدد المنشورات: " + posts.length(), 16));
     }
 
     private void showSettings() {
-        content.addView(
-            makeText("الإعدادات", 23, TEXT, true)
-        );
+        clearContent("إعدادات التطبيق");
 
-        content.addView(
-            makeButton("مسح المنشورات المحلية", () -> {
+        postsLayout.addView(text("Fakhri Social", 22));
+        postsLayout.addView(text(
+                "نسخة تجريبية تحفظ المنشورات على هذا الجهاز.", 15));
+
+        postsLayout.addView(button("حذف جميع المنشورات", () ->
                 new AlertDialog.Builder(this)
-                    .setTitle("تأكيد المسح")
-                    .setMessage("سيتم حذف المنشورات المحفوظة على الجهاز.")
-                    .setNegativeButton("إلغاء", null)
-                    .setPositiveButton("مسح", (d, w) -> {
-                        posts = new JSONArray();
-                        savePosts();
-                        render();
-                    })
-                    .show();
-            })
-        );
+                        .setTitle("تأكيد الحذف")
+                        .setMessage("سيتم حذف جميع المنشورات من هذا الجهاز.")
+                        .setNegativeButton("إلغاء", null)
+                        .setPositiveButton("حذف", (d, w) -> {
+                            posts = new JSONArray();
+                            savePosts();
+                            showHome();
+                        })
+                        .show()), matchParams());
+    }
 
-        content.addView(
-            makeText(
-                "الإصدار 1.0.0\nالبيانات محفوظة على هذا الجهاز.",
-                13, MUTED, false
-            )
-        );
+    private void removePost(long id) {
+        JSONArray result = new JSONArray();
+
+        for (int i = 0; i < posts.length(); i++) {
+            JSONObject p = posts.optJSONObject(i);
+            if (p != null && p.optLong("id") != id) {
+                result.put(p);
+            }
+        }
+
+        posts = result;
+    }
+
+    private void savePosts() {
+        prefs.edit().putString("posts", posts.toString()).apply();
+    }
+
+    private LinearLayout.LayoutParams matchParams() {
+        return new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+    }
+
+    private void addSpace() {
+        View space = new View(this);
+        postsLayout.addView(space,
+                new LinearLayout.LayoutParams(1, dp(8)));
     }
 }
