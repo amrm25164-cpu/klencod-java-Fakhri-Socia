@@ -3,41 +3,14 @@ plugins {
 }
 
 android {
-    namespace "com.fakhri.football"
-    compileSdk 34
+    namespace 'com.fakhri.social'
+    compileSdk 35
 
     defaultConfig {
-        applicationId "com.fakhri.football"
-        minSdk 24
-        targetSdk 34
+        applicationId 'com.fakhri.social'
+        minSdk 23
+        targetSdk 28
         versionCode 1
-        versionName "1.0"
+        versionName '1.0.0'
     }
-
-    buildTypes {
-        debug {
-            minifyEnabled false
-        }
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-
-    sourceSets {
-        main {
-            java.srcDirs = ['src/main/java']
-            res.srcDirs = ['src/main/res']
-            assets.srcDirs = ['src/main/assets']
-        }
-    }
-}
-
-dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
 }
